@@ -8,7 +8,7 @@ import { Smiley, SmileySad, FileVideo } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // External Firebase
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { ref, listAll, getDownloadURL } from "firebase/storage";
 
 // Internal Component
@@ -20,45 +20,44 @@ import { fireStorage, fireStore } from "./firebase";
 import { useFirestore } from "@/lib/useFirestore";
 import { getAllFiles, useFirestorage } from "@/lib/useFirestorage";
 
-const data = [
-  {
-    name: "January",
-    positive: 20,
-    negative: 80,
-  },
-  {
-    name: "February",
-    positive: 34,
-    negative: 66,
-  },
-  {
-    name: "March",
-    positive: 18,
-    negative: 82,
-  },
-  {
-    name: "April",
-    positive: 77,
-    negative: 23,
-  },
-  {
-    name: "May",
-    positive: 52,
-    negative: 48,
-  },
-  {
-    name: "June",
-    positive: 70,
-    negative: 30,
-  },
-  {
-    name: "July",
-    positive: 80,
-    negative: 20,
-  },
-];
-
 export default function Home() {
+  const [data, setData] = useState([
+    {
+      name: "January",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "February",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "March",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "April",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "May",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "June",
+      positive: 0,
+      negative: 0,
+    },
+    {
+      name: "July",
+      positive: 0,
+      negative: 0,
+    },
+  ]);
   const [summary, setSummary] = useState<any[]>([]);
   // const [videos, setVideos] = useState<string[]>([]);
   const [positiveSum, setPositiveSum] = useState<number | boolean>(false);
@@ -71,28 +70,77 @@ export default function Home() {
   } = useFirestore("summary");
 
   useEffect(() => {
-    const unsubscribe = async () => {
-      const querySnapshot = await getDocs(collection(fireStore, "summary"));
-      const document: any[] = [];
-      querySnapshot.forEach((doc) => {
-        document.push({
-          ...doc.data(),
-          id: doc.id,
-        });
-        setSummary(document);
-      });
+    const ws = new WebSocket("ws://localhost:8779");
+    const img = document.getElementById("video-stream") as HTMLImageElement;
 
-      setPositiveSum(
-        document.reduce((prev, _, i, arr) => prev + arr[i].positive, 0)
-      );
-
-      setNegativeSum(
-        document.reduce((prev, _, i, arr) => prev + arr[i].negative, 0)
-      );
+    ws.onmessage = (event) => {
+      img.src = "data:image/jpeg;base64," + event.data;
     };
-    unsubscribe();
+
+    // Firestore real-time listener
+    const unsubscribe = onSnapshot(
+      collection(fireStore, "summary"),
+      (snapshot) => {
+        const documents: any[] = [];
+        snapshot.forEach((doc) => {
+          documents.push({
+            ...doc.data(),
+            id: doc.id,
+          });
+        });
+        setSummary(documents);
+
+        setPositiveSum(
+          documents.reduce((prev, curr) => prev + curr.positive, 0)
+        );
+
+        setNegativeSum(
+          documents.reduce((prev, curr) => prev + curr.negative, 0)
+        );
+        const total = (positiveSum as number) + (negativeSum as number);
+        setData([
+          {
+            name: "January",
+            positive: 0,
+            negative: 0,
+          },
+          {
+            name: "February",
+            positive: 0,
+            negative: 0,
+          },
+          {
+            name: "March",
+            positive: 0,
+            negative: 0,
+          },
+          {
+            name: "April",
+            positive: 0,
+            negative: 0,
+          },
+          {
+            name: "May",
+            positive: (((positiveSum as number) / total) as number) * 100,
+            negative: (((negativeSum as number) / total) as number) * 100,
+          },
+          {
+            name: "June",
+            positive: 0,
+            negative: 0,
+          },
+          {
+            name: "July",
+            positive: 0,
+            negative: 0,
+          },
+        ]);
+      }
+    );
+
     return () => {
       unsubscribe();
+      ws.close();
     };
   }, [videos]);
 
@@ -127,8 +175,15 @@ export default function Home() {
               footer="+0 video from last month"
             />
           </div>
-          <section className="flex">
+          <section className="flex gap-8">
             <DashboardChartComponent data={data} />
+
+            <img
+              id="video-stream"
+              src=""
+              alt="Live Camera"
+              className="w-full h-[400px] border rounded-2xl flex items-center justify-center"
+            />
           </section>
         </section>
       </div>

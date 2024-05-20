@@ -11,12 +11,27 @@ import { useEffect, useState } from "react";
 import BaseSidebarTileComponent from "./base-sidebar-tile-component";
 import { HouseSimple } from "@phosphor-icons/react";
 import { useRouter, usePathname } from "next/navigation";
+import { fireStorage } from "@/app/firebase";
+import { listAll, ref, StorageReference } from "firebase/storage";
+
+async function getAllFiles() {
+  const listRef = ref(fireStorage);
+  const all = await listAll(listRef).then((res) => res.items);
+  return all;
+}
 
 const BaseSidebarComponent = () => {
   const [panelSize, setPanelSize] = useState(6);
+  const [videos, setVideos] = useState<StorageReference[]>([]);
   const handleResizePanel = (size: number) => {
     setPanelSize(size);
   };
+
+  useEffect(() => {
+    getAllFiles().then((files) => {
+      setVideos(files);
+    });
+  });
 
   const router = useRouter();
   const pathName = usePathname();
@@ -57,7 +72,7 @@ const BaseSidebarComponent = () => {
             <BaseSidebarTileComponent
               Icon={FilmReel}
               title="Videos"
-              trail="10"
+              trail={videos.length.toString()}
               isActive={pathName == "/record"}
               isExpanded={panelSize > 11}
               onClick={() => {
